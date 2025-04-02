@@ -1,0 +1,68 @@
+[project]
+name = "cinetrack"
+version = "0.1.0"
+description = "A personal movie and TV series tracker with watch history, custom lists, and achievements"
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "sqlalchemy>=2.0.25",
+    "sqlmodel>=0.0.14",
+    "psycopg2-binary>=2.9.9",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.6",
+    "redis>=5.0.1",
+    "httpx>=0.26.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.5.3",
+    "pydantic-settings>=2.1.0",
+    "alembic>=1.13.1",
+    "tenacity>=8.2.3",
+    "prometheus-client>=0.19.0",
+    "structlog>=24.1.0",
+    "email-validator>=2.1.0.post1"
+]
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+select = ["E", "F", "B", "I", "N", "UP", "PL", "RUF"]
+
+[tool.ruff.isort]
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+python_files = ["test_*.py", "*_test.py"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
+ignore_errors = true
+omit = [
+    "tests/*",
+    "app/migrations/*",
+] 
