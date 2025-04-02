@@ -3,8 +3,8 @@ version: "3.8"
 services:
   backend:
     build: 
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
       target: backend
     container_name: backend-container
     working_dir: /app/backend
@@ -35,10 +35,10 @@ services:
       - .env
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:8000/api/v1
     depends_on:
       - backend
-    command: sh -c "npm run dev"
+    command: sh -c "npm install && npm run dev"
 
   db:
     image: postgres:15

@@ -1,8 +1,9 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { CircularProgress, Box } from '@mui/material';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Search from './pages/Search';
@@ -28,8 +29,84 @@ const theme = createTheme({
 const queryClient = new QueryClient();
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
+
+const AppContent: React.FC = () => {
+  const navigate = useNavigate();
+  const { isLoading } = useAuth();
+
+  useEffect(() => {
+    const handleLogout = () => {
+      navigate('/login');
+    };
+
+    window.addEventListener('auth:logout', handleLogout);
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+    };
+  }, [navigate]);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/search"
+          element={
+            <PrivateRoute>
+              <Search />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/watchlist"
+          element={
+            <PrivateRoute>
+              <Watchlist />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/bucketlist"
+          element={
+            <PrivateRoute>
+              <BucketList />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/recommendations"
+          element={
+            <PrivateRoute>
+              <Recommendations />
+            </PrivateRoute>
+          }
+        />
+      </Routes>
+    </>
+  );
 };
 
 function App() {
@@ -38,44 +115,7 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router>
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route
-              path="/search"
-              element={
-                <PrivateRoute>
-                  <Search />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/watchlist"
-              element={
-                <PrivateRoute>
-                  <Watchlist />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/bucketlist"
-              element={
-                <PrivateRoute>
-                  <BucketList />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/recommendations"
-              element={
-                <PrivateRoute>
-                  <Recommendations />
-                </PrivateRoute>
-              }
-            />
-          </Routes>
+          <AppContent />
         </Router>
       </ThemeProvider>
     </QueryClientProvider>

@@ -24,7 +24,7 @@ import {
   FormControlLabel,
 } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
-import { api } from '../services/api';
+import api from '../services/api';
 import { Content, Recommendation as RecommendationType } from '../types/api';
 
 const Recommendations: React.FC = () => {

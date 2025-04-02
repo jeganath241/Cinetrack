@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
+import json
 
 class ContentType(str, Enum):
     MOVIE = "movie"
@@ -29,6 +30,7 @@ class User(UserBase, table=True):
     watch_goals: List["WatchGoal"] = Relationship(back_populates="user")
     achievements: List["UserAchievement"] = Relationship(back_populates="user")
     watch_history: List["WatchHistory"] = Relationship(back_populates="user")
+    analytics: List["Analytics"] = Relationship(back_populates="user")
 
 class ContentBase(SQLModel):
     title: str
@@ -185,4 +187,35 @@ class WatchHistory(WatchHistoryBase, table=True):
     user_id: int = Field(foreign_key="user.id")
     content_id: int = Field(foreign_key="content.id")
     user: User = Relationship(back_populates="watch_history")
-    content: Content = Relationship(back_populates="watch_history") 
+    content: Content = Relationship(back_populates="watch_history")
+
+class Analytics(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    user: User = Relationship(back_populates="analytics")
+    total_watch_time: int = Field(default=0)  # in minutes
+    total_content_watched: int = Field(default=0)
+    favorite_genres: str = Field(default="[]")  # Store as JSON string
+    favorite_actors: str = Field(default="[]")  # Store as JSON string
+    favorite_directors: str = Field(default="[]")  # Store as JSON string
+    average_rating: float = Field(default=0.0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    def get_favorite_genres(self) -> List[str]:
+        return json.loads(self.favorite_genres)
+
+    def set_favorite_genres(self, genres: List[str]):
+        self.favorite_genres = json.dumps(genres)
+
+    def get_favorite_actors(self) -> List[str]:
+        return json.loads(self.favorite_actors)
+
+    def set_favorite_actors(self, actors: List[str]):
+        self.favorite_actors = json.dumps(actors)
+
+    def get_favorite_directors(self) -> List[str]:
+        return json.loads(self.favorite_directors)
+
+    def set_favorite_directors(self, directors: List[str]):
+        self.favorite_directors = json.dumps(directors) 

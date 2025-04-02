@@ -1,50 +1,82 @@
 import { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { auth } from '../services/api';
 
 interface AuthState {
   isAuthenticated: boolean;
   user: any | null;
+  isLoading: boolean;
 }
 
 export const useAuth = () => {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
     user: null,
+    isLoading: true,
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Verify token and get user data
-      api.get('/auth/me')
-        .then(response => {
+    const verifyToken = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const user = await auth.getCurrentUser();
           setAuthState({
             isAuthenticated: true,
-            user: response.data,
+            user,
+            isLoading: false,
           });
-        })
-        .catch(() => {
-          // Token is invalid or expired
+        } catch (error) {
+          console.error('Token verification failed:', error);
           localStorage.removeItem('token');
           setAuthState({
             isAuthenticated: false,
             user: null,
+            isLoading: false,
           });
+        }
+      } else {
+        setAuthState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
         });
-    }
+      }
+    };
+
+    // Handle token expiration
+    const handleTokenExpiration = () => {
+      localStorage.removeItem('token');
+      setAuthState({
+        isAuthenticated: false,
+        user: null,
+        isLoading: false,
+      });
+      // Dispatch a custom event for navigation
+      window.dispatchEvent(new Event('auth:logout'));
+    };
+
+    // Listen for token expiration events
+    window.addEventListener('auth:expired', handleTokenExpiration);
+
+    // Initial token verification
+    verifyToken();
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('auth:expired', handleTokenExpiration);
+    };
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      const response = await api.post('/auth/login', {
-        username,
-        password,
-      });
-      const { access_token } = response.data;
+      const response = await auth.login(email, password);
+      const { access_token } = response;
       localStorage.setItem('token', access_token);
+      const user = await auth.getCurrentUser();
       setAuthState({
         isAuthenticated: true,
-        user: response.data.user,
+        user,
+        isLoading: false,
       });
       return true;
     } catch (error) {
@@ -53,17 +85,16 @@ export const useAuth = () => {
     }
   };
 
-  const register = async (email: string, password: string) => {
+  const register = async (username: string, email: string, password: string) => {
     try {
-      const response = await api.post('/auth/register', {
-        email,
-        password,
-      });
-      const { access_token } = response.data;
+      const user = await auth.register(username, email, password);
+      const response = await auth.login(email, password);
+      const { access_token } = response;
       localStorage.setItem('token', access_token);
       setAuthState({
         isAuthenticated: true,
-        user: response.data.user,
+        user,
+        isLoading: false,
       });
       return true;
     } catch (error) {
@@ -77,7 +108,10 @@ export const useAuth = () => {
     setAuthState({
       isAuthenticated: false,
       user: null,
+      isLoading: false,
     });
+    // Dispatch a custom event for navigation
+    window.dispatchEvent(new Event('auth:logout'));
   };
 
   return {

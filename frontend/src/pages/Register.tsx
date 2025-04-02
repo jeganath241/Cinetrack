@@ -9,10 +9,12 @@ import {
   Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
+  const { register } = useAuth();
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,6 +22,7 @@ const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -27,10 +30,17 @@ const Register: React.FC = () => {
     }
 
     try {
-      await auth.register(email, password);
-      navigate('/login');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
+      console.log('Attempting registration with:', { username, email });
+      const success = await register(username, email, password);
+      if (success) {
+        navigate('/');
+      } else {
+        setError('Registration failed. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Registration failed. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -46,6 +56,14 @@ const Register: React.FC = () => {
           </Alert>
         )}
         <Box component="form" onSubmit={handleSubmit}>
+          <TextField
+            fullWidth
+            label="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            margin="normal"
+            required
+          />
           <TextField
             fullWidth
             label="Email"

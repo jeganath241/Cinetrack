@@ -9,22 +9,29 @@ import {
   Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    
     try {
-      const response = await auth.login(email, password);
-      localStorage.setItem('token', response.access_token);
-      navigate('/watchlist');
-    } catch (err) {
-      setError('Invalid email or password');
+      const success = await login(email, password);
+      if (success) {
+        navigate('/');
+      } else {
+        setError('Invalid email or password');
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.response?.data?.detail || 'Invalid email or password');
     }
   };
 

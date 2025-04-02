@@ -1,13 +1,14 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import EmailStr, BaseModel
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, Field
 from app.models.models import ContentType
 
 class UserBase(SQLModel):
+    username: str
     email: EmailStr
     is_active: bool = True
-    created_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class UserCreate(UserBase):
     password: str
@@ -308,4 +309,24 @@ class SimilarContentResponse(BaseModel):
 
 class Genre(BaseModel):
     id: int
-    name: str 
+    name: str
+
+class AnalyticsBase(SQLModel):
+    total_watch_time: int = 0  # in minutes
+    total_content_watched: int = 0
+    favorite_genres: str = "[]"  # Store as JSON string
+    favorite_actors: str = "[]"  # Store as JSON string
+    favorite_directors: str = "[]"  # Store as JSON string
+    average_rating: float = 0.0
+
+class AnalyticsCreate(AnalyticsBase):
+    user_id: int
+
+class AnalyticsResponse(AnalyticsBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True 

@@ -22,7 +22,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import { Delete as DeleteIcon, Check as CheckIcon } from '@mui/icons-material';
-import { api } from '../services/api';
+import api from '../services/api';
 import { Content, BucketList as BucketListType } from '../types/api';
 
 const BucketList: React.FC = () => {

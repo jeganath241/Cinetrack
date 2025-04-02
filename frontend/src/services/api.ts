@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import {
   User,
   Token,
@@ -22,7 +22,16 @@ import {
   GenreHeatmap
 } from '../types/api';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+// Declare the env property on ImportMeta
+declare global {
+  interface ImportMeta {
+    env: {
+      VITE_API_URL: string;
+    };
+  }
+}
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -32,7 +41,7 @@ const api = axios.create({
 });
 
 // Add token to requests if it exists
-api.interceptors.request.use((config: AxiosRequestConfig) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('token');
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -40,25 +49,52 @@ api.interceptors.request.use((config: AxiosRequestConfig) => {
   return config;
 });
 
-// Add a response interceptor to handle token expiration
+// Add a response interceptor to handle token expiration and errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('API Error:', error.response?.data || error.message);
+    
+    // Handle 401 Unauthorized errors
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Only remove token and redirect if it's not an auth endpoint
+      const isAuthEndpoint = error.config.url?.includes('/auth/');
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('token');
+        // Dispatch a custom event that the auth hook will listen to
+        window.dispatchEvent(new Event('auth:expired'));
+      }
     }
+    
     return Promise.reject(error);
   }
 );
 
 export const auth = {
   login: async (email: string, password: string): Promise<Token> => {
-    const response = await api.post<Token>('/auth/login', { username: email, password });
+    const formData = new URLSearchParams();
+    formData.append('username', email);
+    formData.append('password', password);
+    const response = await api.post<Token>('/auth/login', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
     return response.data;
   },
-  register: async (email: string, password: string): Promise<User> => {
-    const response = await api.post<User>('/auth/register', { email, password });
+  register: async (username: string, email: string, password: string): Promise<User> => {
+    try {
+      console.log('Registering user:', { username, email });
+      const response = await api.post<User>('/auth/register', { username, email, password });
+      console.log('Registration response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Registration error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  getCurrentUser: async (): Promise<User> => {
+    const response = await api.get<User>('/auth/me');
     return response.data;
   },
 };
