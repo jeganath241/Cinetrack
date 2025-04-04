@@ -1,11 +1,9 @@
-import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import {
   User,
   Token,
   Content,
   WatchlistItem,
-  BucketListCreate,
-  RecommendationCreate,
   CustomList,
   CustomListCreate,
   CustomListItem,
@@ -19,7 +17,8 @@ import {
   WeeklyStats,
   MonthlyStats,
   YearlyStats,
-  GenreHeatmap
+  GenreHeatmap,
+  RecommendationCreate
 } from '../types/api';
 
 // Declare the env property on ImportMeta
@@ -33,11 +32,13 @@ declare global {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
+// Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Enable sending cookies with requests
 });
 
 // Add token to requests if it exists
@@ -52,23 +53,24 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // Add a response interceptor to handle token expiration and errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    console.error('API Error:', error.response?.data || error.message);
-    
-    // Handle 401 Unauthorized errors
+  async (error) => {
     if (error.response?.status === 401) {
-      // Only remove token and redirect if it's not an auth endpoint
+      // Only remove token and trigger event if it's not an auth endpoint
       const isAuthEndpoint = error.config.url?.includes('/auth/');
       if (!isAuthEndpoint) {
         localStorage.removeItem('token');
-        // Dispatch a custom event that the auth hook will listen to
-        window.dispatchEvent(new Event('auth:expired'));
+        window.dispatchEvent(new CustomEvent('auth:logout'));
       }
     }
-    
     return Promise.reject(error);
   }
 );
+
+// Listen for auth events
+window.addEventListener('auth:logout', () => {
+  // Redirect to login page
+  window.location.href = '/login';
+});
 
 export const auth = {
   login: async (email: string, password: string): Promise<Token> => {
@@ -100,14 +102,68 @@ export const auth = {
 };
 
 export const content = {
-  search: async (query: string, type?: string): Promise<Content[]> => {
-    const response = await api.get<Content[]>('/content/search', {
-      params: { query, type },
+  search: async (query: string, type?: string, language?: string) => {
+    const response = await api.get('/content/search', {
+      params: { query, type, language },
     });
     return response.data;
   },
-  getDetails: async (imdbId: string): Promise<Content> => {
-    const response = await api.get<Content>(`/content/${imdbId}`);
+  getShowDetails: async (showId: number) => {
+    const response = await api.get(`/content/show/${showId}`);
+    return response.data;
+  },
+  getEpisodeDetails: async (episodeId: number) => {
+    const response = await api.get(`/content/episode/${episodeId}`);
+    return response.data;
+  },
+  lookupShow: async (params: { imdb?: string; tvdb?: string }) => {
+    const response = await api.get('/content/lookup', { params });
+    return response.data;
+  },
+  getSchedule: async (country: string = 'US', date?: string) => {
+    const response = await api.get('/content/schedule', {
+      params: { country, date },
+    });
+    return response.data;
+  },
+  getWebSchedule: async (country: string = 'US', date?: string) => {
+    const response = await api.get('/content/schedule/web', {
+      params: { country, date },
+    });
+    return response.data;
+  },
+  searchPeople: async (query: string) => {
+    const response = await api.get('/content/people/search', {
+      params: { query },
+    });
+    return response.data;
+  },
+  getPersonDetails: async (personId: number) => {
+    const response = await api.get(`/content/people/${personId}`);
+    return response.data;
+  },
+  getShowUpdates: async (since?: number) => {
+    const response = await api.get('/content/updates/shows', {
+      params: { since },
+    });
+    return response.data;
+  },
+  getPersonUpdates: async (since?: number) => {
+    const response = await api.get('/content/updates/people', {
+      params: { since },
+    });
+    return response.data;
+  },
+  getShowIndex: async (page: number = 1) => {
+    const response = await api.get('/content/shows', {
+      params: { page },
+    });
+    return response.data;
+  },
+  getPeopleIndex: async (page: number = 1) => {
+    const response = await api.get('/content/people', {
+      params: { page },
+    });
     return response.data;
   },
 };
@@ -117,20 +173,12 @@ export const watchlist = {
     const response = await api.get<WatchlistItem[]>('/watchlist');
     return response.data;
   },
-  add: async (contentId: number, watchedEpisodes: number = 0, isCompleted: boolean = false): Promise<WatchlistItem> => {
-    const response = await api.post<WatchlistItem>('/watchlist', {
-      content_id: contentId,
-      watched_episodes: watchedEpisodes,
-      is_completed: isCompleted,
-    });
+  add: async (contentId: number): Promise<WatchlistItem> => {
+    const response = await api.post('/watchlist', { content_id: contentId });
     return response.data;
   },
   update: async (itemId: number, watchedEpisodes: number, isCompleted: boolean): Promise<WatchlistItem> => {
-    const response = await api.put<WatchlistItem>(`/watchlist/${itemId}`, {
-      content_id: itemId,
-      watched_episodes: watchedEpisodes,
-      is_completed: isCompleted,
-    });
+    const response = await api.put(`/watchlist/${itemId}`, { watched_episodes: watchedEpisodes, is_completed: isCompleted });
     return response.data;
   },
   remove: async (itemId: number): Promise<void> => {
@@ -140,20 +188,19 @@ export const watchlist = {
 
 export const bucketList = {
   getAll: async () => {
-    const response = await api.get('/bucketlist/');
+    const response = await api.get('/bucketlist');
     return response.data;
   },
-  add: async (data: BucketListCreate) => {
-    const response = await api.post('/bucketlist/', data);
+  add: async (contentId: number) => {
+    const response = await api.post('/bucketlist', { content_id: contentId });
     return response.data;
   },
-  update: async (id: number, data: BucketListCreate) => {
+  update: async (id: number, data: any) => {
     const response = await api.put(`/bucketlist/${id}`, data);
     return response.data;
   },
   remove: async (id: number) => {
-    const response = await api.delete(`/bucketlist/${id}`);
-    return response.data;
+    await api.delete(`/bucketlist/${id}`);
   },
 };
 
@@ -283,4 +330,4 @@ export const analytics = {
   },
 };
 
-export default api; 
+export default api;

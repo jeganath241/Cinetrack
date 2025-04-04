@@ -12,44 +12,21 @@ from app.schemas.schemas import (
     SimilarContentResponse,
     Genre
 )
-from app.api.v1.endpoints.auth import oauth2_scheme
-from app.core import security
+from app.core.auth import get_current_user
 from datetime import datetime
 from app.services.content_service import content_service
-from app.core.auth import get_current_user
+from app.api.v1.endpoints.auth import get_current_user_optional
 
 router = APIRouter()
-
-async def get_current_user(
-    session: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
-) -> User:
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = security.decode_token(token)
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except Exception:
-        raise credentials_exception
-    
-    user = session.exec(select(User).where(User.email == email)).first()
-    if user is None:
-        raise credentials_exception
-    return user
 
 @router.get("/search", response_model=SearchResponse)
 async def search_content(
     query: str = Query(..., min_length=1),
     page: int = Query(1, description="Page number"),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = None
 ):
     """
-    Search for TV shows
+    Search for TV shows (public endpoint)
     """
     try:
         results = await content_service.search_content(
@@ -185,4 +162,148 @@ async def create_content(
     session.add(db_content)
     session.commit()
     session.refresh(db_content)
-    return db_content 
+    return db_content
+
+@router.get("/search")
+async def search_content(
+    query: str,
+    content_type: Optional[str] = None,
+    language: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Search for content by title
+    """
+    return await content_service.search_content(query, content_type, language, page)
+
+@router.get("/show/{show_id}")
+async def get_show_details(
+    show_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get detailed information about a show
+    """
+    result = await content_service.get_show_details(show_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Show not found")
+    return result
+
+@router.get("/schedule")
+async def get_schedule(
+    country: str = "US",
+    date: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get TV schedule for a specific country and date
+    """
+    return await content_service.get_schedule(country, date)
+
+@router.get("/people/search")
+async def search_people(
+    query: str,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Search for people by name
+    """
+    return await content_service.search_people(query)
+
+@router.get("/people/{person_id}")
+async def get_person_details(
+    person_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get detailed information about a person
+    """
+    result = await content_service.get_person_details(person_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return result
+
+@router.get("/episode/{episode_id}")
+async def get_episode_details(
+    episode_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get detailed information about an episode
+    """
+    result = await content_service.get_episode_details(episode_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Episode not found")
+    return result
+
+@router.get("/lookup")
+async def lookup_show(
+    imdb: Optional[str] = None,
+    tvdb: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Look up a show by external ID (IMDb, TheTVDB)
+    """
+    if imdb:
+        result = await content_service.get_show_by_external_id(imdb, "imdb")
+    elif tvdb:
+        result = await content_service.get_show_by_external_id(tvdb, "thetvdb")
+    else:
+        raise HTTPException(status_code=400, detail="No external ID provided")
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Show not found")
+    return result
+
+@router.get("/updates/shows")
+async def get_show_updates(
+    since: Optional[int] = None,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get updates for shows since a specific timestamp
+    """
+    return await content_service.get_show_updates(since)
+
+@router.get("/updates/people")
+async def get_person_updates(
+    since: Optional[int] = None,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get updates for people since a specific timestamp
+    """
+    return await content_service.get_person_updates(since)
+
+@router.get("/schedule/web")
+async def get_web_schedule(
+    date: Optional[str] = None,
+    country: str = "US",
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get web/streaming schedule
+    """
+    return await content_service.get_web_schedule(date, country)
+
+@router.get("/shows")
+async def get_show_index(
+    page: int = Query(1, ge=1),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get a paginated list of all shows
+    """
+    return await content_service.get_show_index(page)
+
+@router.get("/people")
+async def get_people_index(
+    page: int = Query(1, ge=1),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Any:
+    """
+    Get a paginated list of all people
+    """
+    return await content_service.get_people_index(page)
